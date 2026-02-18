@@ -14,21 +14,28 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
-      # Install the specific NDK and CMake versions required by the old project
-      - name: Install Android NDK and CMake
+      - name: Install Android Components
         run: |
-          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;23.1.7779620" "cmake;3.10.2.4988404"
+          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install \
+            "ndk;23.1.7779620" \
+            "cmake;3.10.2.4988404" \
+            "build-tools;30.0.3"
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Build command ignoring proxies and forcing the NDK path
       - name: Build debug APK
+        # 1. We skip 'downloadBootstraps' because Bintray is dead.
+        # 2. We force-clear all proxy variables.
         run: |
+          export http_proxy=""
+          export https_proxy=""
+          export HTTP_PROXY=""
+          export HTTPS_PROXY=""
           ./gradlew assembleDebug --no-daemon \
-          -Dhttp.proxyHost="" -Dhttp.proxyPort="" \
-          -Dhttps.proxyHost="" -Dhttps.proxyPort="" \
-          -Dorg.gradle.project.android.getFilters.ndk=true
+            -x downloadBootstraps \
+            -Dhttp.proxyHost="" -Dhttp.proxyPort="" \
+            -Dhttps.proxyHost="" -Dhttps.proxyPort=""
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
