@@ -14,16 +14,19 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
+      # This installs the specific NDK version requested by the error
+      - name: Install NDK
+        run: echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;23.1.7779620"
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # We add -D flags to force NO proxy and build the main app
+      # Build command without proxy interference
       - name: Build debug APK
-        run: ./gradlew assembleDebug -Dhttp.proxyHost="" -Dhttp.proxyPort="" -Dhttps.proxyHost="" -Dhttps.proxyPort="" --no-daemon
+        run: ./gradlew assembleDebug --no-daemon -Dhttp.proxyHost -Dhttp.proxyPort -Dhttps.proxyHost -Dhttps.proxyPort
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: rfidtools-debug-apk
-          # Using a wildcard to find the APK regardless of the module name
           path: "**/build/outputs/apk/debug/*.apk"
