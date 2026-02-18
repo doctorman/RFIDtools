@@ -6,7 +6,7 @@ jobs:
   build-debug:
     runs-on: ubuntu-latest
     env:
-      no_proxy: "*"  # Only one is needed; covers both cases in GA
+      no_proxy: "*" 
     steps:
       - uses: actions/checkout@v4
 
@@ -15,14 +15,18 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "17"
+          cache: 'gradle'
 
-      - name: Kill Ghost Proxy and Clear Configs
+      - name: Kill Ghost Proxy and Enable AndroidX
         run: |
-          # Physically remove any local gradle.properties to ensure no hidden settings
+          # Remove local properties to prevent conflicts
           rm -f gradle.properties
           mkdir -p ~/.gradle
-          # Explicitly set empty proxy values in the global gradle config
+          # Set global properties for AndroidX, Memory, and Proxy-killing
           cat <<EOF > ~/.gradle/gradle.properties
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m
           systemProp.http.proxyHost=
           systemProp.http.proxyPort=
           systemProp.https.proxyHost=
@@ -31,7 +35,7 @@ jobs:
 
       - name: Install Android SDK 29, 33, and NDK
         run: |
-          # Pre-loading both versions so libpm3 (29) and the main app (33) both work
+          # Install all required SDKs and Tools for the sub-modules
           echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install \
             "ndk;23.1.7779620" \
             "cmake;3.10.2.4988404" \
@@ -44,8 +48,10 @@ jobs:
 
       - name: Build debug APK
         run: |
-          # Final build command with bypasses
+          # Force AndroidX/Jetifier flags in the command line as a backup
           ./gradlew assembleDebug --no-daemon \
+            -Pandroid.useAndroidX=true \
+            -Pandroid.enableJetifier=true \
             -Dhttp.proxyHost="" -Dhttp.proxyPort="" \
             -Dhttps.proxyHost="" -Dhttps.proxyPort="" \
             -Dhttp.nonProxyHosts="*"
