@@ -5,12 +5,6 @@ on:
 jobs:
   build-debug:
     runs-on: ubuntu-latest
-    env:
-      # Force the system to ignore any 'proxy' hostname
-      no_proxy: "*"
-      NO_PROXY: "*"
-      http_proxy: ""
-      https_proxy: ""
     steps:
       - uses: actions/checkout@v4
 
@@ -19,22 +13,24 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "17"
+          cache: 'gradle' # Automatically caches Gradle dependencies
 
-      - name: Clear Global Gradle Config
-        run: |
-          # Delete any global properties that might have 'proxy' set
-          rm -f ~/.gradle/gradle.properties
-          mkdir -p ~/.gradle
-          echo "systemProp.http.proxyHost=" > ~/.gradle/gradle.properties
-          echo "systemProp.https.proxyHost=" >> ~/.gradle/gradle.properties
+      # NEW: Cache the Android NDK/SDK to save 8 minutes
+      - name: Cache Android SDK/NDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/ndk/23.1.7779620
+            /usr/local/lib/android/sdk/cmake/3.10.2.4988404
+          key: ${{ runner.os }}-android-tools-v1
 
       - name: Install Android Components
         run: |
-          # Install everything needed so Gradle doesn't have to download it
           echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install \
             "ndk;23.1.7779620" \
             "cmake;3.10.2.4988404" \
-            "build-tools;30.0.3" "platforms;android-33"
+            "build-tools;30.0.3" \
+            "platforms;android-33"
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -43,11 +39,11 @@ jobs:
         run: |
           ./gradlew assembleDebug --no-daemon \
             -Dhttp.proxyHost="" -Dhttp.proxyPort="" \
-            -Dhttps.proxyHost="" -Dhttps.proxyPort="" \
-            -DproxyHost="" -DproxyPort=""
-          
+            -Dhttps.proxyHost="" -Dhttps.proxyPort=""
+
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: rfidtools-debug-apk
           path: "**/build/outputs/apk/debug/*.apk"
+          
