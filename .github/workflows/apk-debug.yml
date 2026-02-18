@@ -1,14 +1,10 @@
 name: android-apk-debug
-
 on:
-  push:
-    branches: [ master ]
   workflow_dispatch:
 
 jobs:
   build-debug:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -18,17 +14,24 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # Install the specific NDK and CMake versions required by the old project
+      - name: Install Android NDK and CMake
+        run: |
+          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;23.1.7779620" "cmake;3.10.2.4988404"
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      # Build command ignoring proxies and forcing the NDK path
       - name: Build debug APK
-        run: ./gradlew :apprts:assembleDebug --no-daemon --stacktrace
+        run: |
+          ./gradlew assembleDebug --no-daemon \
+          -Dhttp.proxyHost="" -Dhttp.proxyPort="" \
+          -Dhttps.proxyHost="" -Dhttps.proxyPort="" \
+          -Dorg.gradle.project.android.getFilters.ndk=true
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: rfidtools-debug-apk
-          path: apprts/build/outputs/apk/debug/*.apk
+          path: "**/build/outputs/apk/debug/*.apk"
