@@ -5,6 +5,9 @@ on:
 jobs:
   build-debug:
     runs-on: ubuntu-latest
+    env:
+      no_proxy: "*"
+      NO_PROXY: "*"
     steps:
       - uses: actions/checkout@v4
 
@@ -13,23 +16,28 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "17"
-          cache: 'gradle' # Automatically caches Gradle dependencies
 
-      # NEW: Cache the Android NDK/SDK to save 8 minutes
-      - name: Cache Android SDK/NDK
-        uses: actions/cache@v4
-        with:
-          path: |
-            /usr/local/lib/android/sdk/ndk/23.1.7779620
-            /usr/local/lib/android/sdk/cmake/3.10.2.4988404
-          key: ${{ runner.os }}-android-tools-v1
-
-      - name: Install Android Components
+      - name: Kill Ghost Proxy and Clear Configs
         run: |
+          # Physically remove any local gradle.properties to ensure no hidden settings
+          rm -f gradle.properties
+          mkdir -p ~/.gradle
+          # Explicitly set empty proxy values in the global gradle config
+          cat <<EOF > ~/.gradle/gradle.properties
+          systemProp.http.proxyHost=
+          systemProp.http.proxyPort=
+          systemProp.https.proxyHost=
+          systemProp.https.proxyPort=
+          EOF
+
+      - name: Install Android SDK 29, 33, and NDK
+        run: |
+          # Pre-loading both versions so libpm3 (29) and the main app (33) both work
           echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install \
             "ndk;23.1.7779620" \
             "cmake;3.10.2.4988404" \
             "build-tools;30.0.3" \
+            "platforms;android-29" \
             "platforms;android-33"
 
       - name: Make gradlew executable
@@ -37,13 +45,14 @@ jobs:
 
       - name: Build debug APK
         run: |
+          # Final build command with bypasses
           ./gradlew assembleDebug --no-daemon \
             -Dhttp.proxyHost="" -Dhttp.proxyPort="" \
-            -Dhttps.proxyHost="" -Dhttps.proxyPort=""
+            -Dhttps.proxyHost="" -Dhttps.proxyPort="" \
+            -Dhttp.nonProxyHosts="*"
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: rfidtools-debug-apk
           path: "**/build/outputs/apk/debug/*.apk"
-          
