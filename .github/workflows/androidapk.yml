@@ -1,0 +1,29 @@
+name: android-apk-debug
+on:
+  workflow_dispatch:
+
+jobs:
+  build-debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # We add -D flags to force NO proxy and build the main app
+      - name: Build debug APK
+        run: ./gradlew assembleDebug -Dhttp.proxyHost= -Dhttp.proxyPort= -Dhttps.proxyHost= -Dhttps.proxyPort= --no-daemon
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rfidtools-debug-apk
+          # Using a wildcard to find the APK regardless of the module name
+          path: "**/build/outputs/apk/debug/*.apk"
